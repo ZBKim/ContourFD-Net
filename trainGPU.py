@@ -1,0 +1,518 @@
+import warnings
+warnings.simplefilter("ignore")
+
+import os
+# —— 不要硬编码单卡；默认使用环境变量或回落到 0,1 —— #
+os.environ["CUDA_VISIBLE_DEVICES"] = '7'
+
+import random
+import numpy as np
+import torch
+
+SEED = np.random.randint(0, 2**32 - 1)
+random.seed(SEED)
+np.random.seed(SEED)
+torch.manual_seed(SEED)
+torch.cuda.manual_seed_all(SEED)
+
+import argparse
+import logging
+import mlflow
+import datetime
+
+from tqdm.auto import tqdm
+from matplotlib import pyplot as plt
+from data.dataloader import build_dataloader
+from configs.base import Config, import_config
+from networks import models, losses, metrics, optimizers, schedulers
+
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(message)s",
+)
+
+# ===================== 工具函数 ===================== #
+def is_dp(m):
+    return isinstance(m, torch.nn.DataParallel)
+
+def core(m):
+    return m.module if is_dp(m) else m
+
+def safe_load_state_dict(model, weight_path, strict=True):
+    """兼容单/多卡保存的权重（自动处理 module. 前缀）"""
+    sd = torch.load(weight_path, map_location="cpu")
+    try:
+        model.load_state_dict(sd, strict=strict)
+    except RuntimeError:
+        from collections import OrderedDict
+        new_sd = OrderedDict()
+        for k, v in sd.items():
+            nk = k.replace("module.", "") if k.startswith("module.") else k
+            new_sd[nk] = v
+        model.load_state_dict(new_sd, strict=strict)
+
+def save_state_dict(model, path):
+    torch.save(core(model).state_dict(), path)
+
+def maybe_get_loss_params(criterion):
+    """安全获取 loss 的可学习参数字典"""
+    if criterion is None:
+        return {}
+    # 如果 DataParallel 了（一般不需要），拿里面的
+    crt = core(criterion) if is_dp(criterion) else criterion
+    if hasattr(crt, "get_params") and crt.get_params() is not None:
+        return crt.get_params()
+    return {}
+
+def call_if_has(obj, name):
+    obj_ = core(obj)
+    if hasattr(obj_, name):
+        getattr(obj_, name)()
+
+
+def main(cfg: Config, val_prefetch: bool):
+    # ----------------- Setup -----------------
+    cfg.checkpoint_dir = os.path.join(cfg.checkpoint_dir, cfg.dataloader)
+    current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    mlflow_dir = os.path.join(cfg.checkpoint_dir, "mlruns")
+    os.makedirs(mlflow_dir, exist_ok=True)
+    mlflow_run_name = current_time + "-" + cfg.name
+    mlflow_exp_name = cfg.name
+
+    cfg.checkpoint_dir = os.path.join(cfg.checkpoint_dir, cfg.name, current_time)
+
+    # Log, weight, mlflow folder
+    log_dir = os.path.join(cfg.checkpoint_dir, "logs")
+    os.makedirs(log_dir, exist_ok=True)
+
+    ## Add logger to log folder
+    logging.getLogger().setLevel(logging.INFO)
+    file_handler = logging.FileHandler(os.path.join(log_dir, "train.log"))
+    file_handler.setFormatter(
+        logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    )
+    logger = logging.getLogger(cfg.name)
+    logger.addHandler(file_handler)
+    logger.addHandler(logging.StreamHandler())
+
+    ## Add mlflow to log folder
+    mlflow.set_tracking_uri(uri=f"file://{os.path.abspath(mlflow_dir)}")
+    ## Set mlflow name
+    mlflow.set_experiment(mlflow_exp_name)
+
+    # Preparing checkpoint output
+    weight_last_path = os.path.join(cfg.checkpoint_dir, "weight_last.pt")
+
+    # Save configs
+    logger.info("Saving config to {}".format(cfg.checkpoint_dir))
+    cfg.save(cfg.checkpoint_dir)
+    cfg.show()
+
+    # ----------------- Prepare training -----------------
+    # Build dataloader
+    logger.info("Building dataset...")
+    train_dataloader = build_dataloader(
+        cfg,
+        mode="train",
+        logger=logger,
+    )
+
+    test_dataloader = build_dataloader(
+        cfg,
+        mode=cfg.valid_type,
+        logger=logger,
+        batch_size=1,
+    )
+
+    logger.info("Building model, loss and optimizer...")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device_str = "cuda" if torch.cuda.is_available() else "cpu"
+
+    # ===== Model =====
+    model = getattr(models, cfg.model_type)(cfg)
+    model.to(torch.device("cpu"))
+    if cfg.model_pretrained:
+        safe_load_state_dict(model, cfg.model_pretrained, strict=False)
+    model.to(device)
+
+    # 多 GPU 包装（先加载再包装，避免 key 不匹配）
+    if torch.cuda.device_count() > 1:
+        logger.info(f"Using {torch.cuda.device_count()} GPUs with DataParallel...")
+        model = torch.nn.DataParallel(model)
+    logger.info(
+        "Number of total parameters: {}".format(
+            sum(p.numel() for p in model.parameters())
+        )
+    )
+
+    # ===== Loss & Metric =====
+    # 兼容你原本的 Losses 实现；若返回 None，直接报错
+    criterion = losses.Losses(cfg)
+    if criterion is None:
+        raise RuntimeError("Losses(cfg) 返回 None。请检查 networks.losses.Losses 的实现或 cfg.loss_type 配置。")
+
+    # 不建议对 criterion 做 DataParallel（很多 loss 无需/不支持 DP），只放到 device
+    if isinstance(criterion, torch.nn.Module):
+        criterion.to(device)
+
+    loss_params = maybe_get_loss_params(criterion)
+
+    metric = metrics.Metrics(cfg)
+    if isinstance(metric, torch.nn.Module):
+        metric.to(device)
+
+    # ===== Collect trainable params =====
+    train_params = []
+    if isinstance(loss_params, dict):
+        for key, value in loss_params.items():
+            num_params = sum(p.numel() for p in value)
+            logger.info("Number of parameters in loss {}: {}".format(key, num_params))
+            if num_params > 0:
+                train_params.append({"params": value})
+    # 模型参数
+    train_params.append({"params": model.parameters()})
+    if len(train_params) == 1:
+        train_params = model.parameters()
+
+    '''
+    编码器是FPN，瓶颈处是MFF，解码器是改造的transformer.
+    '''
+
+    optimizer = getattr(optimizers, cfg.optimizer)(train_params, cfg)
+    lr_scheduler = getattr(schedulers, cfg.scheduler)(optimizer, cfg)
+    scaler = torch.cuda.amp.GradScaler(enabled=cfg.use_amp)
+
+    best_values = {}
+
+    global_train_step = 0
+    global_val_step = 0
+    num_steps = len(train_dataloader)
+    classes = [str(i) for i in range(cfg.num_classes)]
+
+    if val_prefetch:
+        logger.info("Prefetching validation data...")
+        test_dataloader = list(test_dataloader)  # prefetch validation data
+        logger.info("Prefetching {} data".format(len(test_dataloader)))
+
+    # ----------------- Training -----------------
+    logger.info("Start training...")
+    with mlflow.start_run(run_name=mlflow_run_name):
+        # Log all configs to mlflow
+        for key, value in cfg.get_params().items():
+            mlflow.log_param(key, value)
+        epoch = 0
+        while epoch < cfg.epochs:
+            epoch += 1
+            if epoch < cfg.transfer_epochs:
+                if cfg.encoder_pretrained:
+                    call_if_has(model, "freeze_encoder")
+                if cfg.decoder_pretrained:
+                    call_if_has(model, "freeze_decoder")
+                if cfg.model_pretrained:
+                    call_if_has(model, "freeze_model")
+                logging.info(
+                    "Number of trainable parameters: {}".format(
+                        sum(p.numel() for p in model.parameters() if p.requires_grad)
+                    )
+                )
+            else:
+                call_if_has(model, "unfreeze_encoder")
+                call_if_has(model, "unfreeze_decoder")
+                call_if_has(model, "unfreeze_model")
+                logging.info(
+                    "Number of trainable parameters: {}".format(
+                        sum(p.numel() for p in model.parameters() if p.requires_grad)
+                    )
+                )
+
+            total_loss_train = []
+            logger.info("Train epoch {}/{}".format(epoch, cfg.epochs))
+
+            if hasattr(metric, "reset"):
+                metric.reset()
+            model.train()
+
+            with tqdm(total=num_steps, ascii=True) as pbar:
+                for step, (inputs, targets, _) in enumerate(train_dataloader):
+                    global_train_step += 1
+
+                    inputs = inputs.to(device, non_blocking=True)
+                    targets = targets.to(device, non_blocking=True)
+
+                    with torch.autocast(
+                        device_type=device_str, dtype=torch.float16, enabled=cfg.use_amp
+                    ):
+                        outputs = model(inputs)
+                        loss = criterion(outputs, targets)
+
+                        # 数值检查（outputs 可能是 list/tuple，按原逻辑只探测 outputs[0]）
+                        if torch.isnan(inputs).any():
+                            logging.warning(f"NaN in inputs at epoch {epoch}, step {step}")
+                        if torch.isnan(targets).any():
+                            logging.warning(f"NaN in targets at epoch {epoch}, step {step}")
+                        if isinstance(outputs, (list, tuple)) and len(outputs) > 0:
+                            out0 = outputs[0]
+                            if torch.isnan(out0).any():
+                                logging.warning(f"NaN in model output at epoch {epoch}, step {step}")
+                            if torch.isinf(out0).any():
+                                logging.warning(f"Inf in model output at epoch {epoch}, step {step}")
+
+                        metric_dict = metric(outputs, targets) if callable(metric) else {}
+
+                    scaler.scale(loss).backward()
+                    scaler.step(optimizer)
+                    scaler.update()
+                    optimizer.zero_grad(set_to_none=True)
+
+                    if cfg.scheduler == "IdentityScheduler":
+                        lr_ = (
+                            cfg.learning_rate
+                            * (1.0 - global_train_step / (num_steps * cfg.epochs))
+                            ** 0.9
+                        )
+                        optimizer.param_groups[0]["lr"] = lr_
+
+                    loss_value = float(loss.detach().cpu().item())
+                    total_loss_train.append(loss_value)
+
+                    if step % cfg.log_freq == 0:
+                        mlflow.log_metric("loss", loss_value, step=global_train_step)
+
+                    postfix = "Epoch {}/{} - loss: {:.4f}".format(
+                        epoch, cfg.epochs, loss_value
+                    )
+
+                    for k, v in (metric_dict.items() if isinstance(metric_dict, dict) else []):
+                        cls = k.split("_")[-1]
+                        if cls not in classes:
+                            if step % cfg.log_freq == 0:
+                                mlflow.log_metric(k, float(v), step=global_train_step)
+                            postfix += " - {}: {:.4f}".format(k, float(v))
+
+                    pbar.set_description(postfix)
+                    pbar.update(1)
+
+                    if global_train_step % cfg.ckpt_save_fred == 0:
+                        checkpoint = {
+                            "epoch": epoch,
+                            "epoch_current_step": step,
+                            "global_train_step": global_train_step,
+                            "global_val_step": global_val_step,
+                            "state_dict_model": core(model).state_dict(),
+                            "state_dict_optim_model": optimizer.state_dict(),
+                            "state_dict_scheduler_model": lr_scheduler.state_dict(),
+                        }
+                        checkpoint.update(best_values)
+                        torch.save(checkpoint, weight_last_path)
+
+            log_info = "Epoch {}/{} - epoch_loss: {:.4f}".format(
+                epoch,
+                cfg.epochs,
+                float(np.mean(total_loss_train).item()),
+            )
+            if hasattr(metric, "compute"):
+                for key, value in (metric.compute() or {}).items():
+                    cls = key.split("_")[-1]
+                    if cls not in classes:
+                        log_info += " - {}: {:.4f}".format(key, float(value))
+            logger.info(log_info)
+
+            # Limit the learning rate
+            if (
+                optimizer.param_groups[0]["lr"] > cfg.learning_rate_min
+                and cfg.scheduler != "IdentityScheduler"
+            ):
+                lr_scheduler.step()
+                if optimizer.param_groups[0]["lr"] < cfg.learning_rate_min:
+                    optimizer.param_groups[0]["lr"] = cfg.learning_rate_min
+            mlflow.log_metric(
+                "learning_rate",
+                float(optimizer.param_groups[0]["lr"]),
+                step=epoch,
+            )
+
+            checkpoint = {
+                "epoch": epoch,
+                "epoch_current_step": 0,
+                "global_train_step": global_train_step,
+                "global_val_step": global_val_step,
+                "state_dict_model": core(model).state_dict(),
+                "state_dict_optim_model": optimizer.state_dict(),
+                "state_dict_scheduler_model": lr_scheduler.state_dict(),
+            }
+            checkpoint.update(best_values)
+            torch.save(checkpoint, weight_last_path)
+
+            # ----------------- Validation -----------------
+            if epoch % cfg.val_epoch_freq == 0:
+                logger.info("Validation epoch {}/{}".format(epoch, cfg.epochs))
+                total_loss_val = []
+                model.eval()
+                if hasattr(metric, "reset"):
+                    metric.reset()
+                global_val_step += 1
+                random_viz = random.randint(0, len(test_dataloader) - 1)
+
+                with torch.no_grad():
+                    for index, (inputs, targets, inputs_raw) in enumerate(
+                        tqdm(test_dataloader)
+                    ):
+                        inputs = inputs.to(device, non_blocking=True)
+                        targets = targets.to(device, non_blocking=True)
+
+                        with torch.autocast(
+                            device_type=device_str,
+                            dtype=torch.float16,
+                            enabled=cfg.use_amp,
+                        ):
+                            outputs = model(inputs)
+                            loss = criterion(outputs, targets)
+                            metric_dict = metric(outputs, targets) if callable(metric) else {}
+
+                        loss_value = float(loss.detach().cpu().item())
+                        total_loss_val.append(loss_value)
+
+                        if index == random_viz:
+                            # Log image to mlflow
+                            ax = plt.subplot(1, 2 + cfg.num_classes, 1)
+
+                            image = inputs_raw[0].detach().cpu().numpy().astype(np.uint8)
+                            target = targets[0].detach().cpu().numpy().astype(np.float32)
+                            pred_tensor = outputs[0][0] if isinstance(outputs, (list, tuple)) else outputs[0]
+                            prediction = pred_tensor.detach().cpu().numpy()
+
+                            ax.imshow(image)
+                            ax.axis("off")
+                            ax.set_title("Input")
+                            labels = np.unique(target)
+                            target *= 255 / max(1, np.max(labels))
+                            target = target.astype(np.uint8)
+                            ax = plt.subplot(1, 2 + cfg.num_classes, 2)
+                            ax.imshow(target, cmap="gray")
+                            ax.axis("off")
+                            ax.set_title("Target")
+                            if prediction.ndim == 2 or prediction.shape[0] == 1:
+                                # sigmoid
+                                prediction = np.squeeze(prediction)
+                                prediction = 1 / (1 + np.exp(-prediction))
+                                prediction = (prediction > 0.5).astype(np.float32)
+                                prediction *= 255.0 / max(1, np.max(labels))
+                                prediction = prediction.astype(np.uint8)
+                                ax = plt.subplot(1, 2 + cfg.num_classes, 3)
+                                ax.imshow(prediction, cmap="gray")
+                                ax.axis("off")
+                                ax.set_title("Prediction")
+                            else:
+                                prediction = np.argmax(prediction, axis=0).astype(np.uint8)
+                                for i in range(cfg.num_classes):
+                                    ax = plt.subplot(1, 2 + cfg.num_classes, 3 + i)
+                                    mask = (prediction == i) * 255
+                                    ax.imshow(mask, cmap="gray")
+                                    ax.axis("off")
+                                    ax.set_title("Predict class {}".format(i))
+
+                            plt.tight_layout()
+                            mlflow.log_figure(
+                                plt.gcf(),
+                                "validation_{}.png".format(str(global_val_step).zfill(4)),
+                            )
+                            plt.close()
+
+                total_loss_val = float(np.mean(total_loss_val).item())
+                mlflow.log_metric(
+                    "val_loss", float(total_loss_val), step=global_val_step
+                )
+                metric_vals = (metric.compute() or {}) if hasattr(metric, "compute") else {}
+                log_metric_dict = {}
+
+                for key, value in metric_vals.items():
+                    mlflow.log_metric("val_" + key, float(value), step=global_val_step)
+                    cls = key.split("_")[-1]
+                    if cls not in classes:
+                        log_metric_dict[key] = float(value)
+
+                log_info = "Epoch {}/{} - val_loss: {:.4f}".format(
+                    epoch, cfg.epochs, total_loss_val
+                )
+                for key, value in metric_vals.items():
+                    log_info += " - {}: {:.4f}".format(key, float(value))
+
+                logger.info(log_info)
+                if total_loss_val < best_values.get("loss", float(np.inf)):
+                    logger.info(
+                        "Loss improved from {:.4f} to {:.4f}".format(
+                            best_values.get("loss", float(np.inf)), total_loss_val
+                        )
+                    )
+                    best_values["loss"] = total_loss_val
+                    save_state_dict(model, os.path.join(cfg.checkpoint_dir, "weight_best_loss.pt"))
+
+                for key, value in log_metric_dict.items():
+                    if key.startswith("mae"):
+                        best_value = best_values.get(key, float(np.inf))
+                    else:
+                        best_value = best_values.get(key, -float(np.inf))
+
+                    found_new_best = (
+                        value < best_value
+                        if key.startswith("mae")
+                        else value > best_value
+                    )
+
+                    if found_new_best:
+                        logger.info(
+                            "Metric {} improved from {:.4f} to {:.4f}".format(
+                                key, best_value, value
+                            )
+                        )
+                        best_values[key] = value
+                        save_state_dict(
+                            model,
+                            os.path.join(
+                                cfg.checkpoint_dir, "weight_best_{}.pt".format(key)
+                            ),
+                        )
+
+    log_info = "Best validation |"
+    for key, value in best_values.items():
+        log_info += " - {}: {:.4f}".format(key, float(value))
+    logger.info(log_info)
+    end_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    logger.info("Training finished at {}".format(end_time))
+
+
+def arg_parser():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "-cfg",
+        "--config",
+        type=str,
+        default="../src/configs/base.py",
+        help="Path to config.py file",
+    )
+    parser.add_argument(
+        "--resume",
+        type=str,
+        default=None,
+        help="Path to resume cfg.log file if want to resume training",
+    )
+    parser.add_argument(
+        "--val_prefetch",
+        action="store_true",
+        help="Prefetch validation data",
+    )
+    parser.add_argument("--debug", action="store_true")
+    return parser.parse_args()
+
+
+if __name__ == "__main__":
+    args = arg_parser()
+    cfg: Config = import_config(args.config)
+    cfg.SEED = SEED
+    level = logging.DEBUG if args.debug else logging.INFO
+    logging.basicConfig(
+        level=level,
+        format="%(asctime)s - %(message)s",
+    )
+    main(cfg, args.val_prefetch)
