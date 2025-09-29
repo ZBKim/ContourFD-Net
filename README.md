@@ -22,7 +22,7 @@ git clone https://github.com/ZBKim/ContourFD-Net.git
 ```bash
 conda create -n ContourFD python=3.10.16 -y
 conda activate ContourFD 
-conda install pytorch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2 pytorch-cuda=11.8 -c pytorch -c nvidia
+conda install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu118
 pip install -r requirements.txt
 ```
 or with conda environment
