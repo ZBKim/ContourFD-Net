@@ -61,7 +61,11 @@ cd src/tools && python busi_02_split_folds.py --data_root ../working/dataset/BUS
 
 - Train BUSI dataset
 ```bash
-cd src && python train.py -cfg configs/BUSI.py
+python train.py -cfg configs/BUSI.py
+```
+or run in mutil GPU
+```bash
+python GPU.py -cfg configs/BUSI.py
 ```
 
 
@@ -70,47 +74,21 @@ cd src && python train.py -cfg configs/BUSI.py
 - After training, you will have the checkpoints saved in the `working/checkpoints` folder which contains the model weights in the `.pt` format and the `.json` file containing the configuration of the model. You can evaluate the model by running the following command:
 ```bash
 # For all checkpoints
-cd src && python eval.py -cfg working/checkpoint/ContourFD-Net/20241120-223413/cfg.json
+python eval.py -cfg working/checkpoint/ContourFD-Net/20241120-223413/cfg.json
 or
 # For specific checkpoint
-cd src && python eval.py -cfg working/checkpoint/ContourFD-Net/20241120-223413/cfg.json --ckpt working/checkpoint/ContourFD-Net/20241120-223413/weight_best_iou.pt 
+python eval.py -cfg working/checkpoint/ContourFD-Net/20241120-223413/cfg.json --ckpt working/checkpoint/ContourFD-Net/20241120-223413/weight_best_iou.pt 
 ```
 
 - For inference, you can run the following command:
 ```bash
 # For all checkpoints
-cd src && python infer.py -cfg working/checkpoint/ContourFD-Net/20241120-223413/cfg.json --input_dir path/to/input_dir --output_dir path/to/output_dir
+python infer.py -cfg yourcfgpath --input_dir datasetPath --output_dir output_dir
 # For specific checkpoint
-cd src && python infer.py -cfg working/checkpoint/ContourFD-Net/20241120-223413/cfg.json --ckpt working/checkpoint/ContourFD-Net/20241120-223413/weight_best_iou.pt --input_dir path/to/input_dir --output_dir path/to/output_dir
+python infer.py -cfg datasetPath --ckpt PtFilePath --input_dir datasetPath --output_dir output_dir
 ```
 
-- We also provide pre-trained models for ISIC and FIVES datasets. you can download the pre-trained models from the assets in the [release page](https://github.com/tpnam0901/ContourFD-Net/releases/tag/assets) and put them in the `src/working/checkpoints` folder. The structure of your folder should be as follows:
-```bash
-src
-├── working
-    ├── checkpoints
-        ├── ISIC
-            ├── mlruns
-            ├── ContourFD-Net
-                ├── FPNEncoderMaskDecoder
-                    20250122-160324
-                        ├── cfg.json
-                        ├── *.pt
-        ├── FIVES
-        ...
-```
 
-- Some results:
-<p align="center">
-    <img src="./assets/performance.png"/>
-</p>
-<p align="center">
-<img src="./assets/isic_viz.png" width="800"/>
-</p>
-<p align="center">
-    <img src="./assets/bkai_viz.png" width="400"/>
-    <img src="./assets/dsb2018_viz.png" width="400"/>
-</p>
 <p align="center">
     <img src="./assets/fives_viz.png" width="800"/>
 </p>
