@@ -36,27 +36,7 @@ or with conda environment
 conda env create -f environment.yml
 ```
 
-- Note: If you met the error `np.bool` in the imgaug library. The simplest way to fix this is to modify `np.bool` to `bool` in the imgaug library `eg. miniconda3/envs/qtseg/lib/python3.8/site-packages/imgaug/augmenters/meta.py - line 305`. This issue may be fixed in the future related to [issue](https://github.com/aleju/imgaug/pull/857). Another way is to downgrade the numpy version to 1.19.5. However, this may cause some errors in other libraries.
-
 #### Preprocessing dataset
-##### Skin lesion segmentation (ISIC)
-- Dataset used in this project is [ISIC2016](https://challenge.isic-archive.com/data/) versions.
-
-- After downloading the dataset, you need to extract it and put it in the data folder. Please rename the folder containing input data to inputs and the folder containing label data to targets. The folder structure should be as follows:
-```
-# Note: do not change the filename of the images
-- working/dataset/ISIC2016 # or any path you want
-    - train
-        - inputs # refer to the input images
-            - *.jpg
-        - targets # refer to the mask images
-            - *.png
-    - test
-        - inputs
-            - *.jpg
-        - targets
-            - *.png
-```
 
 ##### Breast Ultrasound Images Dataset (BUSI)
 - Dataset used in this project is [BUSI](https://scholar.cu.edu.eg/?q=afahmy/pages/dataset) - [link_backup](https://www.kaggle.com/datasets/aryashah2k/breast-ultrasound-images-dataset).
@@ -82,83 +62,6 @@ cd src/tools && python busi_02_split_folds.py --data_root ../working/dataset/BUS
 ```
 - The dataset is sorted by the names of the images before splitting. The samples are chosen by slicing the array with a size of the number of samples in each fold. So, the same fold index will have the same samples in different runs. After the process, the dataset will be split into 5 folds and saved in the `working/dataset/BUSI/folds` folder as used in the paper.
 
-##### BKAI-IGH NeoPolyp-Small
-- Dataset used in this project is [BKAI-IGH NeoPolyp-Small](https://github.com/GivralNguyen/BKAI-IGH-Neopolyp-Segmentation).
-
-- After downloading the dataset, you need to extract the dataset and put it in the data folder. The folder structure should be as follows:
-```
-# Note: do not change the filename of the images
-- working/dataset/BKAI # or any path you want
-    - sample_submission.csv
-    - test/test
-        - *.jpeg
-    - train/train
-        - *.jpeg
-    - train_gt/train_gt
-        - *.jpeg
-```
-- First, before splitting the dataset into 5 folds, we need to convert multi-class masks to binary masks. This can be done by running the following command:
-```bash
-# this will create 2 new folders named train_gt_binary and train_gt_multiclass in train_gt/train_gt folder
-cd src/tools && python bkai_01_preprocess_mask.py --data_root ../working/dataset/BKAI/
-```
-- Then, we can split the dataset into 5 folds by running the following command:
-```bash
-# this will create 2 new folders named folds_binary and folds_multiclass in the dataset folder
-cd src/tools && python bkai_02_split_folds.py --data_root ../working/dataset/BKAI/
-```
-- After the process, the dataset will be split into 5 folds and saved in the `working/dataset/BKAI/folds` folder as used in the paper.
-
-##### Cell segmentation
-- Dataset used in this project is [DSB2018](https://www.kaggle.com/c/data-science-bowl-2018).
-
-- After downloading the dataset, you need to extract the dataset and put it in the data folder. The folder structure should be as follows:
-```
-# Note: do not change the filename of the images
-- working/dataset/DSB2018 # or any path you want
-    - stage1_train
-        - 0acd... # folder name
-            - images
-                - *.png
-            - masks
-                - *.png
-        - 0b1e... # folder name
-            - images
-                - *.png
-            - masks
-                - *.png
-        ...
-```
-- First, before splitting the dataset into 5 folds, we need to merge any sample that has more than 1 label file. This can be done by running the following command:
-```bash
-# this will create 2 new folders named train_gt_binary and train_gt_multiclass in train_gt/train_gt folder
-cd src/tools && python dsb2018_01_combine_mask.py --data_root ../working/dataset/DSB2018/
-```
-- Then, we can split the dataset into 5 folds by running the following command:
-```bash
-# this will create 2 new folders named folds_binary and folds_multiclass in the dataset folder
-cd src/tools && python dsb2018_02_split_folds.py --data_root ../working/dataset/DSB2018/
-```
-- After the process, the dataset will be split into 5 folds and saved in the `working/dataset/DSB2018/folds` folder as used in the paper.
-
-##### Retinal Vessel Segmentation
-- Dataset used in this project is [FIVES](https://figshare.com/articles/figure/FIVES_A_Fundus_Image_Dataset_for_AI-based_Vessel_Segmentation/19688169/1).
-
-- After downloading the dataset, you need to extract it and put it in the data folder. Please rename the folder containing input data to inputs and the folder containing label data to targets. The folder structure should be as follows:
-```
-# Note: do not change the filename of the images
-- working/dataset/ISIC2016 # or any path you want
-    - train
-        - inputs # refer to the Original
-            - *.png
-        - targets # refer to the Ground truth
-            - *.png
-    - test
-        - inputs
-            - *.png
-        - targets
-            - *.png
-```
 
 #### Configuration & Training
 
