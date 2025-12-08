@@ -1,4 +1,4 @@
-# ContourFD-Net
+# ContourFD Net for IoT-devices
 
 **ContourFD-Net: A Finite-Difference-Driven Contour Attention Network for Efficient Medical Image Segmentation on Edge Devices**
 
