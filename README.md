@@ -1,10 +1,16 @@
 # ContourFD Net for IoT-devices
 
-<div align="center">
-[![python](https://img.shields.io/badge/-Python_3.10.16-blue?logo=python&logoColor=white)](https://www.python.org/downloads/)
-[![pytorch](https://img.shields.io/badge/Torch_2.6.0-ee4c2c?logo=pytorch&logoColor=white)](https://pytorch.org/get-started/locally/)
-[![cuda](https://img.shields.io/badge/-CUDA_11.8-green?logo=nvidia&logoColor=white)](https://developer.nvidia.com/cuda-toolkit-archive)
-</div>
+<p align="center">
+  <a href="https://www.python.org/downloads/">
+    <img src="https://img.shields.io/badge/-Python_3.10.16-blue?logo=python&logoColor=white" />
+  </a>
+  <a href="https://pytorch.org/get-started/locally/">
+    <img src="https://img.shields.io/badge/Torch_2.6.0-ee4c2c?logo=pytorch&logoColor=white" />
+  </a>
+  <a href="https://developer.nvidia.com/cuda-toolkit-archive">
+    <img src="https://img.shields.io/badge/-CUDA_11.8-green?logo=nvidia&logoColor=white" />
+  </a>
+</p>
 **ContourFD-Net: A Finite-Difference-Driven Contour Attention Network for Efficient Medical Image Segmentation on Edge Devices**
 
 ContourFD-Net is a contour-aware medical image segmentation network that leverages finite-difference gradient guidance and attention mechanisms to better capture lesion boundaries, especially in challenging medical images such as breast ultrasound. Its lightweight design is highly suitable for application in medical IoT devices.
