@@ -7,7 +7,9 @@ ContourFD-Net is a contour-aware medical image segmentation network that leverag
 <p align="center">
     <img src="./overall.png" width="800" />
 </p>
-
+<p align="center">
+    <img src="./FLOPs_vs_IoU_BUSI_final_clean_axes.png" width="800" />
+</p>
 ---
 
 ## 🔗 Pretrained Weights
