@@ -12,16 +12,15 @@ ContourFD-Net is a contour-aware medical image segmentation network that leverag
 
 ## 🔗 Pretrained Weights
 
-We provide pretrained weights to help reproduce the results in the paper.
+We provide pretrained weights to help reproduce the results reported in the paper.
 
+* **Pre-trained models (four folds) – ContourFD-Net (best IoU checkpoints)**
+  👉 [Download (Google Drive)](https://drive.google.com/drive/folders/1nosiIXYoeIE-2ZM8z3vHd627TvxK8cN9?usp=sharing)
 
-* **Pre-trained models (four) – ContourFD-Net (best IoU checkpoint)**
-  👉 [Download (Google Drive)]([https://your-google-drive-link.com](https://drive.google.com/drive/folders/1nosiIXYoeIE-2ZM8z3vHd627TvxK8cN9?usp=sharing])
-  
 ### How to Use Pretrained Weights
 
-1. 下载 `.pt` 模型文件（例如 `weight_best_iou.pt`）。
-2. 建议目录结构如下（也可以用你自己的路径，只要命令行参数一致即可）：
+1. Download the `.pt` model file(s) (e.g., `weight_best_iou.pt`).
+2. We recommend organizing them as follows (you can use any path as long as it matches your command-line arguments):
 
 ```text
 working/checkpoints/ContourFD-Net/20241120-223413/
@@ -29,7 +28,7 @@ working/checkpoints/ContourFD-Net/20241120-223413/
     weight_best_iou.pt
 ```
 
-3. 评估时：
+3. **Evaluation example**
 
 ```bash
 python eval.py \
@@ -37,7 +36,7 @@ python eval.py \
   --ckpt working/checkpoints/ContourFD-Net/20241120-223413/weight_best_iou.pt
 ```
 
-4. 推理时：
+4. **Inference example**
 
 ```bash
 python infer.py \
@@ -73,7 +72,7 @@ cd ContourFD-Net
 
 2. **Create a conda environment & install dependencies**
 
-**Option A: Manually create environment**
+**Option A: Manually create the environment**
 
 ```bash
 conda create -n ContourFD python=3.10.16 -y
@@ -156,7 +155,7 @@ working/dataset/BUSI/
 
 ## 🏋️ Training
 
-Make sure you are in the project root (e.g. `ContourFD-Net/`) and the dataset path in the config is correct.
+Make sure you are in the project root (e.g., `ContourFD-Net/`) and the dataset path in the config is correct.
 
 ### Single-GPU training on BUSI
 
@@ -228,14 +227,14 @@ python infer.py \
   --output_dir path/to/save/results
 ```
 
-* `--input_dir` 支持一个包含待分割图像的目录。
-* `--output_dir` 将保存模型输出的分割结果（通常为 mask / overlay）。
+* `--input_dir` should point to a directory containing the input images to segment.
+* `--output_dir` will store the predicted segmentation results (e.g., masks / overlays).
 
 ---
 
 ## 📌 Notes
 
-* Please make sure the paths in the config file (`configs/BUSI.py` or your custom config) match your dataset and working directories.
+* Make sure the paths in the config file (`configs/BUSI.py` or your custom config) match your dataset and working directories.
 * For reproducibility, you can fix random seeds in the config or training script (PyTorch / NumPy / Python `random`).
 
 ---
@@ -253,7 +252,7 @@ If you find this repository useful in your research, please consider citing:
 }
 ```
 
-(请根据你的真实论文信息替换 `author`、`journal`、`year` 等字段。)
+(Please replace `author`, `journal`, `year`, and other fields with your actual publication information.)
 
 ---
 
