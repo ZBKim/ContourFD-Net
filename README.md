@@ -12,6 +12,7 @@
     <img src="https://img.shields.io/badge/-CUDA_11.8-green?logo=nvidia&logoColor=white" />
   </a>
 </p>
+
 **ContourFD-Net: A Finite-Difference-Driven Contour Attention Network for Efficient Medical Image Segmentation on Edge Devices**
 
 ContourFD-Net is a contour-aware medical image segmentation network that leverages finite-difference gradient guidance and attention mechanisms to better capture lesion boundaries, especially in challenging medical images such as breast ultrasound. Its lightweight design is highly suitable for application in medical IoT devices.
