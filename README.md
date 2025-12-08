@@ -5,7 +5,7 @@
 ContourFD-Net is a contour-aware medical image segmentation network that leverages finite-difference gradient guidance and attention mechanisms to better capture lesion boundaries, especially in challenging medical images such as breast ultrasound.
 
 <p align="center">
-    <img src="./assets/fives_viz.png" width="800" />
+    <img src="./overall.png" width="800" />
 </p>
 
 ---
