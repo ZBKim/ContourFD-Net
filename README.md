@@ -14,14 +14,10 @@ ContourFD-Net is a contour-aware medical image segmentation network that leverag
 
 We provide pretrained weights to help reproduce the results in the paper.
 
-> ⚠️ **请将下面的链接替换为你自己的真实下载地址（Google Drive / 百度网盘等）**
 
-* **BUSI – ContourFD-Net (best IoU checkpoint)**
-  👉 [Download (Google Drive)](https://your-google-drive-link.com)
-
-* **(Optional) BUSI – All folds / other trained models**
-  👉 [Download (Baidu Netdisk)](https://your-baidu-pan-link.com) 提取码：`xxxx`
-
+* **Pre-trained models (four) – ContourFD-Net (best IoU checkpoint)**
+  👉 [Download (Google Drive)]([https://your-google-drive-link.com](https://drive.google.com/drive/folders/1nosiIXYoeIE-2ZM8z3vHd627TvxK8cN9?usp=sharing))
+  
 ### How to Use Pretrained Weights
 
 1. 下载 `.pt` 模型文件（例如 `weight_best_iou.pt`）。
