@@ -2,7 +2,7 @@
 
 **ContourFD-Net: A Finite-Difference-Driven Contour Attention Network for Efficient Medical Image Segmentation on Edge Devices**
 
-ContourFD-Net is a contour-aware medical image segmentation network that leverages finite-difference gradient guidance and attention mechanisms to better capture lesion boundaries, especially in challenging medical images such as breast ultrasound.
+ContourFD-Net is a contour-aware medical image segmentation network that leverages finite-difference gradient guidance and attention mechanisms to better capture lesion boundaries, especially in challenging medical images such as breast ultrasound. Its lightweight design is highly suitable for application in medical IoT devices.
 
 <p align="center">
     <img src="./overall.png" width="800" />
@@ -52,8 +52,8 @@ python infer.py \
 
 * **Environment**
 
-  * OS: Debian 12 (bookworm)
-  * GPU: NVIDIA RTX 3090 / RTX 3080 Ti
+  * OS: Ubuntu 22.04
+  * GPU: NVIDIA RTX 4090 * 4
   * CUDA: 11.8
   * cuDNN: 8.9.7
   * Python: 3.10.16
