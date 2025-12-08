@@ -16,7 +16,7 @@ We provide pretrained weights to help reproduce the results in the paper.
 
 
 * **Pre-trained models (four) – ContourFD-Net (best IoU checkpoint)**
-  👉 [Download (Google Drive)]([https://your-google-drive-link.com](https://drive.google.com/drive/folders/1nosiIXYoeIE-2ZM8z3vHd627TvxK8cN9?usp=sharing))
+  👉 [Download (Google Drive)]([https://your-google-drive-link.com](https://drive.google.com/drive/folders/1nosiIXYoeIE-2ZM8z3vHd627TvxK8cN9?usp=sharing])
   
 ### How to Use Pretrained Weights
 
