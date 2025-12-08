@@ -99,12 +99,10 @@ conda activate ContourFD
 
 ## 📂 Dataset Preparation
 
-### Breast Ultrasound Images Dataset (BUSI)
+### Take BUSI as an example
 
 * Dataset: **BUSI**
-
-  * Official page: [BUSI Dataset](https://scholar.cu.edu.eg/?q=afahmy/pages/dataset)
-  * Backup: [Kaggle – Breast Ultrasound Images Dataset](https://www.kaggle.com/datasets/aryashah2k/breast-ultrasound-images-dataset)
+  * Official download page: [BUSI Dataset](https://scholar.cu.edu.eg/?q=afahmy/pages/dataset)
 
 1. **Download & extract the dataset**, then organize it as:
 
