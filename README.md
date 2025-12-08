@@ -10,7 +10,7 @@ ContourFD-Net is a contour-aware medical image segmentation network that leverag
 <p align="center">
     <img src="./FLOPs_vs_IoU_BUSI_final_clean_axes.png" width="800" />
 </p>
----
+
 
 ## 🔗 Pretrained Weights
 
@@ -236,23 +236,9 @@ python infer.py \
 
 ## 📌 Notes
 
-* Make sure the paths in the config file (`configs/BUSI.py` or your custom config) match your dataset and working directories.
+* Make sure the paths in the config file match your dataset and working directories.
 * For reproducibility, you can fix random seeds in the config or training script (PyTorch / NumPy / Python `random`).
 
----
-
-## 📝 Citation
-
-If you find this repository useful in your research, please consider citing:
-
-```bibtex
-@article{your_contourfdnet_paper,
-  title   = {ContourFD-Net: Finite Difference Gradient-Guided Contour-Aware Attention Network for Medical Image Segmentation},
-  author  = {Your Name and Others},
-  journal = {Journal Name},
-  year    = {2024}
-}
-```
 
 (Please replace `author`, `journal`, `year`, and other fields with your actual publication information.)
 
@@ -260,8 +246,9 @@ If you find this repository useful in your research, please consider citing:
 
 ## 🤝 Acknowledgements
 
-* BUSI Dataset authors for providing the breast ultrasound dataset.
+* BUSI, ISIC2016, BKAI, DSB2018 Dataset authors for providing the breast ultrasound dataset.
 * PyTorch and related open-source libraries used in this project.
+* Part code came from QTseg.
 
 ---
 
