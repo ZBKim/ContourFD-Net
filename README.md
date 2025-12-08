@@ -250,9 +250,3 @@ python infer.py \
 * PyTorch and related open-source libraries used in this project.
 * Part code came from QTseg.
 
----
-
-## 📄 License
-
-This project is released under the **MIT License** (or your actual license).
-Please see the `LICENSE` file for details.
