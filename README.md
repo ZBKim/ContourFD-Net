@@ -1,94 +1,274 @@
 # ContourFD-Net
-ContourFD-Net: Finite Difference Gradient-Guided Contour-Aware Attention Network for Medical Image Segmentation
 
-## How To Use
+**ContourFD-Net: Finite Difference Gradient-Guided Contour-Aware Attention Network for Medical Image Segmentation**
 
-#### Dependencies
+ContourFD-Net is a contour-aware medical image segmentation network that leverages finite-difference gradient guidance and attention mechanisms to better capture lesion boundaries, especially in challenging medical images such as breast ultrasound.
 
+<p align="center">
+    <img src="./assets/fives_viz.png" width="800" />
+</p>
 
-- Environment:
-    - OS: Debian 12 (bookworm)
-    - GPU: NVIDIA 3090 / NVIDIA 3080ti
-    - CUDA 11.8
-    - cuDNN 8.9.7
-    - Python 3.10.16
-    - PyTorch 2.6.0
-    
-- Clone this repository 
+---
+
+## 🔗 Pretrained Weights
+
+We provide pretrained weights to help reproduce the results in the paper.
+
+> ⚠️ **请将下面的链接替换为你自己的真实下载地址（Google Drive / 百度网盘等）**
+
+* **BUSI – ContourFD-Net (best IoU checkpoint)**
+  👉 [Download (Google Drive)](https://your-google-drive-link.com)
+
+* **(Optional) BUSI – All folds / other trained models**
+  👉 [Download (Baidu Netdisk)](https://your-baidu-pan-link.com) 提取码：`xxxx`
+
+### How to Use Pretrained Weights
+
+1. 下载 `.pt` 模型文件（例如 `weight_best_iou.pt`）。
+2. 建议目录结构如下（也可以用你自己的路径，只要命令行参数一致即可）：
+
+```text
+working/checkpoints/ContourFD-Net/20241120-223413/
+    cfg.json
+    weight_best_iou.pt
+```
+
+3. 评估时：
+
+```bash
+python eval.py \
+  -cfg working/checkpoints/ContourFD-Net/20241120-223413/cfg.json \
+  --ckpt working/checkpoints/ContourFD-Net/20241120-223413/weight_best_iou.pt
+```
+
+4. 推理时：
+
+```bash
+python infer.py \
+  -cfg working/checkpoints/ContourFD-Net/20241120-223413/cfg.json \
+  --ckpt working/checkpoints/ContourFD-Net/20241120-223413/weight_best_iou.pt \
+  --input_dir path/to/your/images \
+  --output_dir path/to/save/results
+```
+
+---
+
+## 📦 Dependencies
+
+* **Environment**
+
+  * OS: Debian 12 (bookworm)
+  * GPU: NVIDIA RTX 3090 / RTX 3080 Ti
+  * CUDA: 11.8
+  * cuDNN: 8.9.7
+  * Python: 3.10.16
+  * PyTorch: 2.6.0
+
+---
+
+## 🚀 Installation
+
+1. **Clone this repository**
+
 ```bash
 git clone https://github.com/ZBKim/ContourFD-Net.git
+cd ContourFD-Net
 ```
-- Create a conda environment and install requirements
+
+2. **Create a conda environment & install dependencies**
+
+**Option A: Manually create environment**
+
 ```bash
 conda create -n ContourFD python=3.10.16 -y
-conda activate ContourFD 
-conda install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu118
+conda activate ContourFD
+
+# Install PyTorch (CUDA 11.8)
+conda install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 \
+  --index-url https://download.pytorch.org/whl/cu118
+
+# Install Python dependencies
 pip install -r requirements.txt
 ```
-or with conda environment
+
+**Option B: Use the provided environment file**
+
 ```bash
 conda env create -f environment.yml
+conda activate ContourFD
 ```
 
-#### Preprocessing dataset
+---
 
-##### Breast Ultrasound Images Dataset (BUSI)
-- Dataset used in this project is [BUSI](https://scholar.cu.edu.eg/?q=afahmy/pages/dataset) - [link_backup](https://www.kaggle.com/datasets/aryashah2k/breast-ultrasound-images-dataset).
+## 📂 Dataset Preparation
 
-- After downloading the dataset, you need to extract the dataset and put it in the data folder. The folder structure should be as follows:
+### Breast Ultrasound Images Dataset (BUSI)
+
+* Dataset: **BUSI**
+
+  * Official page: [BUSI Dataset](https://scholar.cu.edu.eg/?q=afahmy/pages/dataset)
+  * Backup: [Kaggle – Breast Ultrasound Images Dataset](https://www.kaggle.com/datasets/aryashah2k/breast-ultrasound-images-dataset)
+
+1. **Download & extract the dataset**, then organize it as:
+
+```text
+working/dataset/BUSI/          # or any path you want
+    benign/
+        *.png
+    malignant/
+        *.png
+    normal/
+        *.png
 ```
-# Note: do not change the filename of the images
-- working/dataset/BUSI # or any path you want
-    - benign
-        - *.png
-    - malignant
-        - *.png
-    - normal
-        - *.png
-```
-- First, before splitting the dataset into 5 folds, we need to merge any sample that has more than 1 label file. This can be done by running the following command:
+
+> ⚠️ **Important**: Do NOT change the original filenames of the images.
+
+2. **Combine multiple masks of the same sample**
+
+Some BUSI samples have more than one label file. Merge them using:
+
 ```bash
-cd src/tools && python busi_01_combine_masks.py --data_root ../working/dataset/BUSI/
+cd src/tools
+python busi_01_combine_masks.py --data_root ../working/dataset/BUSI/
 ```
-- Then, we can split the dataset into 5 folds by running the following command:
+
+3. **Split BUSI into 5 folds**
+
 ```bash
-cd src/tools && python busi_02_split_folds.py --data_root ../working/dataset/BUSI/
+cd src/tools
+python busi_02_split_folds.py --data_root ../working/dataset/BUSI/
 ```
-- The dataset is sorted by the names of the images before splitting. The samples are chosen by slicing the array with a size of the number of samples in each fold. So, the same fold index will have the same samples in different runs. After the process, the dataset will be split into 5 folds and saved in the `working/dataset/BUSI/folds` folder as used in the paper.
 
+* The images are **sorted by filename** before splitting.
+* Splitting is deterministic: the same fold index will always contain the same samples between runs.
+* After this step, the directory will look like:
 
+```text
+working/dataset/BUSI/
+    benign/
+    malignant/
+    normal/
+    folds/
+        fold0/
+        fold1/
+        fold2/
+        fold3/
+        fold4/
+```
 
+---
 
-- Train BUSI dataset
+## 🏋️ Training
+
+Make sure you are in the project root (e.g. `ContourFD-Net/`) and the dataset path in the config is correct.
+
+### Single-GPU training on BUSI
+
 ```bash
 python train.py -cfg configs/BUSI.py
 ```
-or run in mutil GPU
+
+### Multi-GPU training
+
 ```bash
 python GPU.py -cfg configs/BUSI.py
 ```
 
+> 💡 You can customize the config (number of folds, loss functions, batch size, learning rate, etc.) in `configs/BUSI.py`.
 
-#### Evaluation & Inference
+---
 
-- After training, you will have the checkpoints saved in the `working/checkpoints` folder which contains the model weights in the `.pt` format and the `.json` file containing the configuration of the model. You can evaluate the model by running the following command:
-```bash
-# For all checkpoints
-python eval.py -cfg working/checkpoint/ContourFD-Net/20241120-223413/cfg.json
-or
-# For specific checkpoint
-python eval.py -cfg working/checkpoint/ContourFD-Net/20241120-223413/cfg.json --ckpt working/checkpoint/ContourFD-Net/20241120-223413/weight_best_iou.pt 
+## 📊 Evaluation
+
+After training, checkpoints and config files are saved under:
+
+```text
+working/checkpoints/ContourFD-Net/<timestamp>/
+    cfg.json
+    weight_latest.pt
+    weight_best_iou.pt
+    ...
 ```
 
-- For inference, you can run the following command:
+### Evaluate with all checkpoints of an experiment
+
 ```bash
-# For all checkpoints
-python infer.py -cfg yourcfgpath --input_dir datasetPath --output_dir output_dir
-# For specific checkpoint
-python infer.py -cfg datasetPath --ckpt PtFilePath --input_dir datasetPath --output_dir output_dir
+python eval.py \
+  -cfg working/checkpoints/ContourFD-Net/20241120-223413/cfg.json
 ```
 
+* This will iterate over all available `.pt` files in the corresponding directory and report metrics.
 
-<p align="center">
-    <img src="./assets/fives_viz.png" width="800"/>
-</p>
+### Evaluate with a specific checkpoint
+
+```bash
+python eval.py \
+  -cfg working/checkpoints/ContourFD-Net/20241120-223413/cfg.json \
+  --ckpt working/checkpoints/ContourFD-Net/20241120-223413/weight_best_iou.pt
+```
+
+---
+
+## 🔍 Inference
+
+You can run inference on a folder of images using a trained or pretrained checkpoint.
+
+### Inference with all checkpoints
+
+```bash
+python infer.py \
+  -cfg working/checkpoints/ContourFD-Net/20241120-223413/cfg.json \
+  --input_dir path/to/your/images \
+  --output_dir path/to/save/results
+```
+
+### Inference with a specific checkpoint
+
+```bash
+python infer.py \
+  -cfg working/checkpoints/ContourFD-Net/20241120-223413/cfg.json \
+  --ckpt working/checkpoints/ContourFD-Net/20241120-223413/weight_best_iou.pt \
+  --input_dir path/to/your/images \
+  --output_dir path/to/save/results
+```
+
+* `--input_dir` 支持一个包含待分割图像的目录。
+* `--output_dir` 将保存模型输出的分割结果（通常为 mask / overlay）。
+
+---
+
+## 📌 Notes
+
+* Please make sure the paths in the config file (`configs/BUSI.py` or your custom config) match your dataset and working directories.
+* For reproducibility, you can fix random seeds in the config or training script (PyTorch / NumPy / Python `random`).
+
+---
+
+## 📝 Citation
+
+If you find this repository useful in your research, please consider citing:
+
+```bibtex
+@article{your_contourfdnet_paper,
+  title   = {ContourFD-Net: Finite Difference Gradient-Guided Contour-Aware Attention Network for Medical Image Segmentation},
+  author  = {Your Name and Others},
+  journal = {Journal Name},
+  year    = {2024}
+}
+```
+
+(请根据你的真实论文信息替换 `author`、`journal`、`year` 等字段。)
+
+---
+
+## 🤝 Acknowledgements
+
+* BUSI Dataset authors for providing the breast ultrasound dataset.
+* PyTorch and related open-source libraries used in this project.
+
+---
+
+## 📄 License
+
+This project is released under the **MIT License** (or your actual license).
+Please see the `LICENSE` file for details.
